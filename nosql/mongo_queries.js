@@ -72,8 +72,3 @@ db.products.updateOne(
 // Index speeds up queries filtering by category (used in OP2 and OP3),
 // reducing full collection scans as the catalog grows.
 db.products.createIndex({ category: 1 });
-
-## Database Recommendation
-For a healthcare startup building a patient management system, My recommendation would be a relational database such as MySQL (or another relational database) for the core system of record. Patient data is highly sensitive which must be correct and highly consistent: appointments, prescriptions, lab results, and billing records cannot end up being partially written or contradictory. Relational databases provide strong ACID guarantees and enforce constraints, which helps prevent data corruption.
-MongoDB can still be valuable, but typically for secondary workloads where the schema is flexible or frequently changing—such as storing semi-structured device payloads, logs, or evolving form-like data. Under CAP considerations, many distributed NoSQL deployments prioritize availability and partition tolerance and may accept eventual consistency (BASE). For clinical operations, strong consistency is generally safer.
-If a fraud detection module is added,a hybrid design would be preferred and keep MySQL for transactional interactions
