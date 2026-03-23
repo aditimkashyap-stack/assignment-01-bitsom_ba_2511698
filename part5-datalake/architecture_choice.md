@@ -1,4 +1,10 @@
-Out of three Data Warehouse, Data Lake, or Data Lakehouse, I would go ahead with data lakehouse since,
-(1) handles all four heterogeneous data types in one platform
-(2) supports both ML and BI workloads from the same storage layer
-(3) provides cost-efficient scalability with governance (ACID, schema evolution) that a raw Data Lake can't offer.
+## Architecture Recommendation
+For a fast-growing food delivery startup collecting GPS location logs, customer text reviews, payment transactions, and restaurant menu images, a Data Lakehouse architecture would be highly recommended. A Data Lakehouse combines the raw storage flexibility of a Data Lake with the schema enforcement, ACID transactions, and query performance of a Data Warehouse — making it the most suitable fit for this startup's diverse and rapidly evolving data landscape.
+Reasons:
+1.Heterogeneous Data Types in a Single Platform.
+The startup's data spans four fundamentally different modalities: structured (payment transactions), semi-structured (GPS logs, JSON reviews), and unstructured (menu images). A pure Data Warehouse can only handle structured, schema-on-write data efficiently. A Data Lake can store everything but offers no governance or performance guarantees. A Lakehouse — implemented via an open table format such as Delta Lake or Apache Iceberg on cloud object storage — stores all four data types natively while still supporting SQL analytics on structured and semi-structured data without forcing premature schema decisions.
+2.Support for Diverse Workloads (ML + BI + Streaming).
+GPS logs and customer reviews feed machine learning models (delivery ETAs, sentiment analysis), while payment data powers BI dashboards and finance reporting. A Lakehouse supports both workloads from the same storage layer. Frameworks like Apache Spark or DuckDB can run ML feature engineering directly on raw files, while BI tools connect via an optimised SQL engine — eliminating the need to duplicate data across a separate lake and warehouse.
+3.Cost-Efficient Scalability with Governance.
+Food delivery platforms exhibit extreme volume spikes, meal times especially during weekends. A Lakehouse on object storage (S3/GCS) scales storage costs almost linearly and decouples compute from storage. Crucially, features like schema evolution, time-travel queries, and row-level security — available in Delta Lake / Iceberg — provide the data governance and auditability that payment transaction data legally requires, something a raw Data Lake cannot offer without significant custom tooling.
+In summary, the Lakehouse architecture avoids the rigidity of a warehouse and the governance gaps of a lake, making it an automatic choice as this startup scales.
