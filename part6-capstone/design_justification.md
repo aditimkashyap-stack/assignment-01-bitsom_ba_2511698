@@ -1,1 +1,20 @@
+## Capstone design justification:
+Storage Systems
+Goal 1 — Predict Patient Readmission Risk
+Historical treatment data is stored in PostgreSQL (OLTP) for structured patient records and a Feature Store (Feast) for pre-computed ML features. PostgreSQL holds the ground-truth clinical records, while Feast materialises engineered features (e.g. number of prior admissions in 90 days, average length-of-stay) and serves them at low latency during model inference. Raw historical files (lab PDFs, DICOM images) are retained in Amazon S3 (Object Storage) as the immutable bronze layer.
+Goal 2 — Natural Language Queries on Patient History
+A Vector Database (Pinecone) stores dense embeddings of patient history documents, enabling semantic similarity search. A Retrieval-Augmented Generation (RAG) pipeline retrieves relevant context from Pinecone and passes it to an LLM (Claude / GPT-4) to answer doctor queries. PostgreSQL is also queried for structured lookups (e.g. exact date of a lab result).
+Goal 3 — Monthly Management Reports
+An OLAP Data Warehouse (Snowflake / BigQuery) is used. Aggregated data (bed occupancy, cost-per-department, admission counts) is loaded nightly via a dbt transformation pipeline. BI tools (Metabase / Tableau) connect directly to the warehouse and render pre-built dashboards, enabling hospital administrators to self-serve reports without touching production systems.
+Goal 4 — Real-Time ICU Vitals
+A Time-Series Database (InfluxDB) is purpose-built for high-frequency numeric streams — it compresses sequential numeric data efficiently and supports millisecond-resolution range queries. Apache Kafka acts as the durable message bus between ICU devices and InfluxDB, decoupling producers from consumers and providing replay capability.
 
+OLTP vs OLAP Boundary
+The OLTP boundary covers everything from raw ingestion through to PostgreSQL. ICU devices push to Kafka; HL7/FHIR APIs write patient events to PostgreSQL; pharmacy and billing transactions are committed with full ACID guarantees in PostgreSQL. These writes are optimised for low-latency, row-level operations and enforce referential integrity (patient- order- prescription).
+The OLAP boundary begins at the nightly ETL/ELT step, where a dbt pipeline reads from PostgreSQL and transforms aggregated, denormalised fact and dimension tables into Snowflake. No analytical queries reports, trend analysis, department-wise cost drilldowns — ever touch the OLTP database. This separation prevents long-running analytical scans from degrading the transactional write path and ensures consistent query performance for both workloads.
+The Feature Store sits at this boundary: it reads from both OLTP (for ground-truth labels and recent events) and the data warehouse (for historical aggregates), materialises features, and then serves them to the ML layer — acting as a bridge between transactional freshness and analytical depth.
+
+Trade-offs
+Trade-off: Data Freshness vs Complexity
+The nightly ETL batch window means the OLAP warehouse is up to 24 hours stale. For monthly management reports this is acceptable, but if hospital management ever needs intra-day occupancy figures, the architecture falls short.
+Mitigation: Introduce a Lambda Architecture pattern specifically for the reporting pipeline: a fast path using Kafka → Apache Flink for streaming aggregates (e.g. real-time bed count) feeds a lightweight in-memory cache (Redis), while the nightly batch path continues to populate Snowflake for historical depth. BI dashboards can query Redis for today's figures and Snowflake for trends. This adds operational complexity (two pipelines to maintain) but the hospital can adopt it incrementally — starting with batch-only and adding the streaming path only for the handful of metrics that genuinely require intra-day freshness. Alternatively, a modern Lakehouse table format (Apache Iceberg on S3 + Snowflake external tables) can support micro-batch ingestion at 15-minute intervals, reducing staleness without full streaming infrastructure.
